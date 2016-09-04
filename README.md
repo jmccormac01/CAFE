@@ -15,7 +15,9 @@ CAFE Data Reduction - *WORK IN PROGRESS*
 ----------------------------------------
 
 parseCafeHeaders.py - a script to check what targets have been observed
+
 parseCafeSkyApertures.py - a script to analyse manually placed sky apertures for automating the procedure
+
 ristretto.py - my attempt at automating the extraction of echelle spectra - based heavily on my long-slit code Spector.py
 
 Screendumps of Reduction Steps
