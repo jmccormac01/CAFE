@@ -10,6 +10,7 @@ CAFE spectrogrpah at Calar Alto, Spain.
 mkfinders.py makes 3' by 3' finding charts (N up, E left)
 using pyds9 - this should be replaced with Paul's new gnerator
 
+![CAFE SNR](img/cafe-snr.png)
 
 CAFE Data Reduction - *WORK IN PROGRESS*
 ----------------------------------------
