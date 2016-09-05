@@ -5,13 +5,13 @@ import sys
 import os
 import time
 import glob as g
-import numpy as np
+from contextlib import contextmanager
 from ccdproc import (
     CCDData,
     ImageFileCollection,
     combine,
     subtract_bias,
-    trim_image
+    flat_correct
     )
 from astropy.io import fits
 from astropy import units as u
@@ -25,6 +25,12 @@ try:
     FileNotFoundError
 except NameError:
     FileNotFoundError = IOError
+
+# pylint: disable=invalid-name
+# pylint: disable=redefined-builtin
+# pylint: disable=no-member
+# pylint: disable=redefined-outer-name
+# pylint: disable=superfluous-parens
 
 ###############################
 ########## EDIT HERE ##########
@@ -108,7 +114,7 @@ def checkHeader(filename, hdr):
     Add DISPAXIS to the header object if it is missing
     """
     try:
-        d = hdr['DISPAXIS']
+        hdr['DISPAXIS']
     except KeyError:
         print('{}: Adding DISPAXIS = {}'.format(filename, DISPAXIS))
         hdr['DISPAXIS'] = DISPAXIS
@@ -126,7 +132,7 @@ def trimFiles():
         print('Trimming image {0:s} to {0:s}[:,120:]'.format(filename))
         data, hdr = fits.getdata(filename, header=True)
         hdr = checkHeader(filename, hdr)
-        fits.writeto(filename, data[:,120:], header=hdr, clobber=True)
+        fits.writeto(filename, data[:, 120:], header=hdr, clobber=True)
 
 def renameFiles(images):
     """
@@ -207,15 +213,25 @@ def makeMasterFlat(images):
             print('There are no flats, skipping...')
             master_flat = None
 
+@contextmanager
+def cd(path):
+    """
+    Improved os.chdir()
+    """
+    old_dir = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(old_dir)
+
 def importIraf():
     """
     Import IRAF and return it for others to use
     """
-    here = os.getcwd()
-    os.chdir(LOGINCl)
-    from pyraf import iraf
-    os.chdir(here)
-    time.sleep(2)
+    with cd(LOGINCL):
+        from pyraf import iraf
+        time.sleep(2)
     return iraf
 
 def identifyOrders(iraf, images):
@@ -227,9 +243,9 @@ def identifyOrders(iraf, images):
     iraf.imred(_doprint=0)
     iraf.echelle(_doprint=0)
     # set up apall for echelle order identification
-    iraf.apall.setParam('apertur','')
+    iraf.apall.setParam('apertur', '')
     iraf.apall.setParam('format', 'echelle')
-    iraf.apall.setParam('reference','')
+    iraf.apall.setParam('reference', '')
     iraf.apall.setParam('profile', '')
     # operation mode
     iraf.apall.setParam('interac', 'yes')
@@ -319,9 +335,9 @@ def identifyOrders(iraf, images):
 
 def setupFlatApertures(iraf, order_ref_frame):
     """
-    Taylor the aperture model for the flats
+    Tailor the aperture model for the flats
     """
-    iraf.apall.setParam('referen',order_ref_frame)
+    iraf.apall.setParam('referen', order_ref_frame)
     # set up apall for echelle order identification
     iraf.apall.setParam('format', 'echelle')
     # operation mode
@@ -378,8 +394,7 @@ def getFlattenedFlat():
     """
     Read in the newly flattened flat for all to flat...
     """
-    flatten_flat = CCDData.read(, unit=u.adu)
-    return flattened_flat
+    return CCDData.read(MASTER_FLAT_FLAT, unit=u.adu)
 
 def getLightTravelTimes(ra, dec, time2corr):
     """
@@ -458,7 +473,7 @@ if __name__ == '__main__':
     # flatten the flat
     flattenFlat()
     # read in the flattened flat
-    flattened_flat = getFlattenedFlat():
+    flattened_flat = getFlattenedFlat()
     # correct the arcs
     for filename in images.files_filtered(imagetyp=ARC_KEYWORD):
         correctData(filename, flattened_flat, 'arc')
