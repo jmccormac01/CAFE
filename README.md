@@ -17,15 +17,22 @@ CAFE Data Reduction
 
 My ristretto.py code has been retired before completion since the release of CERES.
 All reductions for CAFE should be done using CERES. See the CERES repo README for
-instructions on how to run it.
+full instructions on how to run it. Below is a quick summary of how to set things up
+
+   1. Gather all the new CAFE in a specific location
+   1. Run parseCafeHeaders.py script (with --update\_object if necessary) to set up the reffile for each night and tweak the image headers
+   1. cd ~/Documents/ceres/cafe
+   1. python cafepipe.py /path/to/data
+   1. reffile.txt should be in the raw data folder from the step above
+
+The CERES cafepipe.py script will then churn through all the data and make a series of
+plots and a results.txt file. Revise all the output to confirm things are ok. Use the
+housekeeping section below to then collect all the results into the database.
 
 CAFE Housekeeping Scripts
 -------------------------
 
 parseCafeHeaders.py - a script to check what targets have been observed
-
-parseCafeSkyApertures.py - a script to analyse manually placed sky apertures for automating the procedure
-
 
 Contributors
 ------------
