@@ -60,6 +60,7 @@ RA_KEYWORD = 'RA'
 DEC_KEYWORD = 'DEC'
 DATEOBS_KEYWORD = 'DATE'
 EXPTIME_KEYWORD = 'EXPTIME'
+OBJECT_KEYWORD = 'OBJECT'
 # observatory location
 OLAT = 37.2236
 OLON = -2.5463
@@ -228,9 +229,15 @@ def cd(path):
 def importIraf():
     """
     Import IRAF and return it for others to use
+
+    Echelle reductions use the noao>imred>echelle
+    packages
     """
     with cd(LOGINCL):
         from pyraf import iraf
+        iraf.noao(_doprint=0)
+        iraf.imred(_doprint=0)
+        iraf.echelle(_doprint=0)
         time.sleep(2)
     return iraf
 
@@ -238,10 +245,6 @@ def identifyOrders(iraf, images):
     """
     Function to identify the location of the echelle orders
     """
-    # load IRAF packages
-    iraf.noao(_doprint=0)
-    iraf.imred(_doprint=0)
-    iraf.echelle(_doprint=0)
     # set up apall for echelle order identification
     iraf.apall.setParam('apertur', '')
     iraf.apall.setParam('format', 'echelle')
@@ -316,7 +319,7 @@ def identifyOrders(iraf, images):
     iraf.apall.setParam('lsigma', '4.')
     iraf.apall.setParam('usigma', '4.')
     iraf.apall.setParam('nsubaps', '1')
-    iraf.apall.saveParList(filename="apall.pars")
+    iraf.apall.saveParList(filename="apall_orderdef.pars")
 
     print('Finding last flat to use as order location reference')
     flat_list = []
@@ -373,7 +376,7 @@ def flattenFlat():
     iraf.apflatten.setParam('nsum', '1')
     iraf.apflatten.setParam('thresho', '10')
     iraf.apflatten.setParam('pfit', 'fit2d')
-    iraf.apflatten.setParam('clean', 'yes')
+    iraf.apflatten.setParam('clean', 'no')
     iraf.apflatten.setParam('saturat', SATURATION)
     iraf.apflatten.setParam('readnoi', RDNOISE)
     iraf.apflatten.setParam('gain', GAIN)
@@ -416,7 +419,7 @@ def correctData(filename, flattened_flat, filetype):
     with fits.open(filename) as fitsfile:
         hdr = fitsfile[0].header
         if filetype == 'science':
-            half_exptime = hdr[EXPTIME_KEYWORD]/2.
+            half_exptime = float(hdr[EXPTIME_KEYWORD])/2.
             dateobs = hdr[DATEOBS_KEYWORD]
             ra = float(hdr[RA_KEYWORD])/3600.
             dec = float(hdr[DEC_KEYWORD])/3600.
@@ -435,9 +438,195 @@ def correctData(filename, flattened_flat, filetype):
             hdr['UT-MID'] = jd_mid.isot
     ccd = CCDData.read(filename, unit=u.adu)
     ccd = flat_correct(ccd, flattened_flat)
-    new_filename = "{}_f.fits".format(filename.split(IMAGE_EXTENSION)[0])
-    fits.writeto(new_filename, ccd, hdr)
+    fits.writeto(filename, ccd, hdr, clobber=True)
 
+# TODO: Decide on how to treat (or not) scattered light
+
+def parseHeader(filename, keyword):
+    """
+    Parse a fits header to return a specific keyword
+    """
+    with fits.open(filename) as fitsfile:
+        value = fitsfile[0].header[keyword]
+    return value
+
+def getArcTimes(images):
+    """
+    Get a dictionary of arc times to use for
+    determining which arcs go with each science
+    spectrum
+    """
+    arc_times = {}
+    for f in images.files_filtered(imagetyp=ARC_KEYWORD):
+        dateobs = parseHeader(f, DATEOBS_KEYWORD)
+        arc_times[f] = Time(dateobs,
+                            scale='utc',
+                            format='isot',
+                            location=OBSERVATORY)
+    return arc_times
+
+def findMatchingArcPair(arc_times, filename):
+    """
+    Figure out which two arcs sandwhich the science
+    spectrum. Add those values to the header using
+    the REFSPEC1 and REFSPEC2 keywords
+    """
+    dateobs = Time(parseHeader(filename, DATEOBS_KEYWORD),
+                   scale='utc',
+                   format='isot',
+                   location=OBSERVATORY)
+    # split the arcs into before and after
+    diff_b, diff_a = [], []
+    for key in sorted(arc_times):
+        diff = (dateobs-arc_times[key]).sec
+        if diff > 0:
+            diff_b.append(key)
+        else:
+            diff_a.append(key)
+    # keep track of arc sandwhich
+    arclist = []
+    # check for the BEFORE arc
+    try:
+        before = diff_b[-1]
+        arclist.append(before)
+    except IndexError:
+        print('WARNING: NO BEFORE ARC FOUND FOR {}'.format(filename))
+    # check for the AFTER arc
+    try:
+        after = diff_a[0]
+        arclist.append(after)
+    except IndexError:
+        print('WARNING: NO AFTER ARC FOUND FOR {}'.format(filename))
+    if len(arclist) == 0:
+        print('FATAL: NO BEFORE/AFTER ARC FOUND FOR {}'.format(filename))
+        sys.exit(1)
+    else:
+        refspec_factor = round(1./len(arclist), 1)
+    # edit the filename headers for update the REFSPEC1/2 keywords
+    # this is used for identify to wavelength calibration
+    for i in range(0, len(arclist)):
+        refspec = "{} {}".format(arclist[i].split(".fits")[0], refspec_factor)
+        print('{}: REFSPEC{} {}'.format(filename, i+1, arclist[i]))
+        iraf.hedit(images=filename,
+                   fields="REFSPEC{}".format(i+1),
+                   value=refspec,
+                   add="yes",
+                   verify="no",
+                   show="yes")
+    return arclist
+
+def extractSpectra(filename, arclist, order_ref_frame, global_arclist):
+    """
+    Extract echelle spectra using IRAF interactively
+
+    TODO:
+        Interpolate across the two arcs either side to
+        get the most accurate wavelength solution
+        Finish docstring
+        Add method of using super arc for inital
+        identify
+    """
+    # set up apall for echelle order identification
+    iraf.apall.setParam('apertur', '')
+    iraf.apall.setParam('format', 'echelle')
+    iraf.apall.setParam('reference', order_ref_frame)
+    iraf.apall.setParam('profile', '')
+    # operation mode
+    iraf.apall.setParam('interac', 'yes')
+    iraf.apall.setParam('find', 'no')
+    iraf.apall.setParam('recen', 'no')
+    iraf.apall.setParam('resize', 'no')
+    iraf.apall.setParam('edit', 'no')
+    iraf.apall.setParam('trace', 'no')
+    iraf.apall.setParam('fittrac', 'no')
+    iraf.apall.setParam('extract', 'yes')
+    iraf.apall.setParam('extras', 'yes')
+    iraf.apall.setParam('review', 'yes')
+    iraf.apall.setParam('line', '904')
+    iraf.apall.setParam('nsum', '5')
+    # default aperture parameters
+    iraf.apall.setParam('lower', '-5')
+    iraf.apall.setParam('upper', '5')
+    # default background parameters
+    iraf.apall.setParam('b_funct', 'chebyshev')
+    iraf.apall.setParam('b_order', '2')
+    iraf.apall.setParam('b_sampl', '-9:-7,5:7')
+    iraf.apall.setParam('b_naver', '-3')
+    iraf.apall.setParam('b_niter', '3')
+    iraf.apall.setParam('b_low_r', '3')
+    iraf.apall.setParam('b_high', '3')
+    iraf.apall.setParam('b_grow', '0')
+    # aperture centering parameters
+    iraf.apall.setParam('width', '5')
+    iraf.apall.setParam('radius', '10')
+    iraf.apall.setParam('threshold', '800')
+    # automatic finding and centering parameters
+    iraf.apall.setParam('nfind', '78')
+    iraf.apall.setParam('minsep', '5')
+    iraf.apall.setParam('order', 'increasing')
+    # resizing parameters
+    iraf.apall.setParam('aprecen', '')
+    iraf.apall.setParam('npeaks', 'INDEF')
+    iraf.apall.setParam('shift', 'yes')
+    # resizing parameters
+    iraf.apall.setParam('llimit', 'INDEF')
+    iraf.apall.setParam('ulimit', 'INDEF')
+    iraf.apall.setParam('ylevel', '0.1')
+    iraf.apall.setParam('peak', 'yes')
+    iraf.apall.setParam('bkg', 'yes')
+    iraf.apall.setParam('r_grow', '0')
+    iraf.apall.setParam('avglimi', 'no')
+    # tracing parameters
+    iraf.apall.setParam('t_nsum', '3')
+    iraf.apall.setParam('t_step', '10')
+    iraf.apall.setParam('t_nlost', '4')
+    iraf.apall.setParam('t_funct', 'spline3')
+    iraf.apall.setParam('t_order', '3')
+    iraf.apall.setParam('t_sampl', '*')
+    iraf.apall.setParam('t_naver', '1')
+    iraf.apall.setParam('t_niter', '0')
+    iraf.apall.setParam('t_low_r', '3')
+    # extraction parameters
+    iraf.apall.setParam('backgro', 'fit')
+    iraf.apall.setParam('skybox', '6')
+    iraf.apall.setParam('weights', 'variance')
+    iraf.apall.setParam('pfit', 'fit2d')
+    iraf.apall.setParam('clean', 'no')
+    iraf.apall.setParam('saturat', SATURATION)
+    iraf.apall.setParam('readnoi', RDNOISE)
+    iraf.apall.setParam('gain', GAIN)
+    iraf.apall.setParam('lsigma', '3.')
+    iraf.apall.setParam('usigma', '3.')
+    iraf.apall.setParam('nsubaps', '1')
+    iraf.apall.saveParList(filename="apall_extraction.pars")
+
+    # extract the science spectrum
+    with fits.open(filename) as fitsfile:
+        target_id = fitsfile[0].header[OBJECT_KEYWORD]
+    print("Extracting spectrum of {} from {}".format(target_id, filename))
+    print("Check aperture and background. Change if required")
+    print("AP: m = mark aperture, d = delete aperture")
+    print("SKY: s = mark sky, t = delete sky, f = refit")
+    print("q = continue\n")
+    iraf.apall(input=filename)
+    print("Spectrum extracted!\n")
+
+    # extract the arcs
+    for arc in arclist:
+        if arc not in global_arclist:
+            iraf.apall(input=arc,
+                       reference=order_ref_frame,
+                       interac="no",
+                       extract="yes",
+                       extras="no",
+                       review="no",
+                       backgro="none",
+                       weights="none",
+                       clean="no")
+            print("Arc {} extracted".format(arc))
+            global_arclist.append(arc)
+
+    # wavelength calibration
 
 if __name__ == '__main__':
     print('\n\n---------------------------------------------------------')
@@ -480,6 +669,15 @@ if __name__ == '__main__':
     # correct the science spectra
     for filename in images.files_filtered(imagetyp=SCIENCE_KEYWORD):
         correctData(filename, flattened_flat, 'science')
+    # get the arc times for file association
+    arc_times = getArcTimes(images)
+    # make a global list to track the extracted arcs
+    # some arcs are REFSPEC for several science images
+    global_arclist = []
+    for filename in images.files_filtered(imagetyp=SCIENCE_KEYWORD):
+        arclist = findMatchingArcPair(arc_times, filename)
+        extractSpectra(filename, arclist, order_ref_frame, global_arclist)
+
     #cleanCalibs()
     # extract wavelength calibrated and continuum normalised spectra
     #extractSpectra()

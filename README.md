@@ -12,23 +12,20 @@ using pyds9 - this should be replaced with Paul's new gnerator
 
 ![CAFE SNR](img/cafe-snr.png)
 
-CAFE Data Reduction - *WORK IN PROGRESS*
-----------------------------------------
+CAFE Data Reduction
+-------------------
+
+My ristretto.py code has been retired before completion since the release of CERES.
+All reductions for CAFE should be done using CERES. See the CERES repo README for
+instructions on how to run it.
+
+CAFE Housekeeping Scripts
+-------------------------
 
 parseCafeHeaders.py - a script to check what targets have been observed
 
 parseCafeSkyApertures.py - a script to analyse manually placed sky apertures for automating the procedure
 
-ristretto.py - my attempt at automating the extraction of echelle spectra - based heavily on my long-slit code Spector.py
-
-Screendumps of Reduction Steps
--------------------------------
-
-![first orders](img/first_orders.png)
-![last orders](img/last_orders.png)
-![order ID settings 1](img/order_id_apall_1.png)
-![order ID settings 2 ](img/order_id_apall_2.png)
-![apflatten settings](img/apflatten.png)
 
 Contributors
 ------------
