@@ -20,14 +20,23 @@ All reductions for CAFE should be done using CERES. See the CERES repo README fo
 full instructions on how to run it. Below is a quick summary of how to set things up
 
    1. Gather all the new CAFE in a specific location
-   1. Run parseCafeHeaders.py script (with --update\_object if necessary) to set up the reffile for each night and tweak the image headers
-   1. cd ~/Documents/ceres/cafe
-   1. python cafepipe.py /path/to/data
+   1. Run parseCafeHeaders.py script (with --update\_object --reffile if necessary) to set up the reffile for each night and tweak the image headers
+   1. parseCafeHeaders.py can also be used to just print a summary of all the data
    1. reffile.txt should be in the raw data folder from the step above
+   1. cd ~/Documents/ceres/cafe
+   1. python cafepipe.py /path/to/data -npools 2
 
 The CERES cafepipe.py script will then churn through all the data and make a series of
 plots and a results.txt file. Revise all the output to confirm things are ok. Use the
 housekeeping section below to then collect all the results into the database.
+
+CERES Notes
+-----------
+
+Sometimes CERES ```cafepipe.py``` will segfault or throw a malloc error. I've traced 
+this to typically come from the order identification for the last order (no. 90).
+To get around this set the first instance of ```nord = 89``` in the script. **Add an 
+argparse argument to address this**
 
 CAFE Housekeeping Scripts
 -------------------------

@@ -206,7 +206,7 @@ if __name__ == '__main__':
     spec_types, coords = {}, {}
     prop_motions, ccf_masks = {}, {}
     # loop over the directories and get all info at once
-    data_directories = g.glob('16*')
+    data_directories = g.glob('160*')
 
     print('-------------------------')
     print('----PER NIGHT SUMMARY----')
@@ -273,7 +273,7 @@ if __name__ == '__main__':
                     reffile.append("{},{},{},1,{},4".format(object_id,
                                                            coords[object_id],
                                                            prop_motions[object_id],
-                                                           ccf_masks[swasp_id]))
+                                                           ccf_masks[object_id]))
 
             # print the reffile
             print('\n')
