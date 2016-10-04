@@ -60,8 +60,8 @@ if __name__ == '__main__':
             else:
                 swasp_id = None
             bjd_mid = ls[1]
-            mask_rv = ls[2]
-            mask_rv_err = ls[3]
+            mask_velocity = ls[2]
+            mask_velocity_err = ls[3]
             bisector = ls[4]
             bisector_err = ls[5]
             mask_ccf_height = ls[13]
@@ -77,8 +77,8 @@ if __name__ == '__main__':
                     object_name,
                     bjd_mid,
                     mask,
-                    mask_rv,
-                    mask_rv_err,
+                    mask_velocity,
+                    mask_velocity_err,
                     mask_ccf_height,
                     mask_ccf_fwhm,
                     bisector,
@@ -103,8 +103,8 @@ if __name__ == '__main__':
                            obj,
                            bjd_mid,
                            mask,
-                           mask_rv,
-                           mask_rv_err,
+                           mask_velocity,
+                           mask_velocity_err,
                            mask_ccf_height,
                            mask_ccf_fwhm,
                            bisector,
