@@ -206,7 +206,7 @@ if __name__ == '__main__':
     spec_types, coords = {}, {}
     prop_motions, ccf_masks = {}, {}
     # loop over the directories and get all info at once
-    data_directories = g.glob('160*')
+    data_directories = g.glob('16*')
 
     print('-------------------------')
     print('----PER NIGHT SUMMARY----')

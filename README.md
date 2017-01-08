@@ -25,6 +25,7 @@ full instructions on how to run it. Below is a quick summary of how to set thing
    1. reffile.txt should be in the raw data folder from the step above
    1. cd ~/Documents/ceres/cafe
    1. python cafepipe.py /path/to/data -npools 2
+   1. Run ingestCafeResults.py afterwards to put the results in the database table
 
 The CERES cafepipe.py script will then churn through all the data and make a series of
 plots and a results.txt file. Revise all the output to confirm things are ok. Use the
@@ -35,8 +36,7 @@ CERES Notes
 
 Sometimes CERES ```cafepipe.py``` will segfault or throw a malloc error. I've traced 
 this to typically come from the order identification for the last order (no. 90).
-To get around this set the first instance of ```nord = 89``` in the script. **Add an 
-argparse argument to address this**
+To get around this set the first instance of ```nord = 89``` in the script. **This was fixed by Rafael**
 
 CAFE Housekeeping Scripts
 -------------------------

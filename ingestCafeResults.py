@@ -1,8 +1,6 @@
 """
 Script to ingest the results files from cafepipe.py
 
-THIS IS NOT FINISHED AND HAD NOT BEEN TESTED
-
 Results file has the following structure:
     0-  Object name
     1-  MBJD
@@ -72,44 +70,21 @@ if __name__ == '__main__':
             mask = pdf_name.split('.')[-2].split('_')[-1]
             qry = """
                 INSERT INTO eblm_cafe (
-                    image_id,
-                    swasp_id,
-                    object_name,
-                    bjd_mid,
-                    mask,
-                    mask_velocity,
-                    mask_velocity_err,
-                    mask_ccf_height,
-                    mask_ccf_fwhm,
-                    bisector,
-                    bisector_err,
-                    snr_5150
+                    image_id, swasp_id, object_name,
+                    bjd_mid, mask, mask_velocity,
+                    mask_velocity_err, mask_ccf_height,
+                    mask_ccf_fwhm, bisector,
+                    bisector_err, snr_5150
                     )
                 VALUES (
-                    '{}',
-                    '{}',
-                    '{}',
-                    {},
-                    '{}',
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {},
-                    {})
-                """.format(image_id,
-                           swasp_id,
-                           obj,
-                           bjd_mid,
-                           mask,
-                           mask_velocity,
-                           mask_velocity_err,
-                           mask_ccf_height,
-                           mask_ccf_fwhm,
-                           bisector,
-                           bisector_err,
-                           snr_5150)
+                    '{}', '{}', '{}', {}, '{}', {},
+                    {}, {}, {}, {}, {},{}
+                    )
+                """.format(image_id, swasp_id, obj,
+                           bjd_mid, mask, mask_velocity,
+                           mask_velocity_err, mask_ccf_height,
+                           mask_ccf_fwhm, bisector,
+                           bisector_err, snr_5150)
             print(qry)
             if args.ingest:
                 with db.cursor() as cur:
